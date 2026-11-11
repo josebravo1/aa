@@ -70,6 +70,48 @@ FILE_CONFIG = {
             "R1": "111016",
             "R2": "111021"
         }
+    },
+    "22PCBA": {
+        "path": r"C:\Ruta\22PCBA.xlsx",
+        "headers": [
+            "Device",
+            "Estación",
+            "Fecha",
+            "Turno",
+            "Hora",
+            "Eventos",
+            "Problema",
+            "Solución",
+            "Problemas de otros departamentos",
+            "Tiempo muerto (Min)",
+            "Piezas falladas",
+            "NDF"
+        ],
+        "stations": {
+            "FW": ["415008", "415009", "415010", "415011"],
+            "FCT": ["415012", "415013"]
+        }
+    },
+    "22TLA": {
+        "path": r"C:\Ruta\22TLA.xlsx",
+        "headers": [
+            "Device",
+            "Estación",
+            "Fecha",
+            "Turno",
+            "Hora",
+            "Eventos",
+            "Problema",
+            "Solución",
+            "Problemas de otros departamentos",
+            "Tiempo muerto (Min)",
+            "Piezas falladas",
+            "NDF"
+        ],
+        "stations": {
+            "FW": ["415008", "415009", "415010", "415011"],
+            "FCT": ["415012", "415013"]
+        }
     }
 }
 
@@ -185,16 +227,16 @@ class FormWindow:
             label.grid(row=0, column=0, sticky="w", padx=(0, 8))
 
             if header == "Device":
-                entry = tk.Entry(cell, width=30, state="readonly", justify="center")
-                entry.grid(row=0, column=1, sticky="ew")
-                self.entries[header] = entry
+                combo = ttk.Combobox(cell, width=30, state="readonly", justify="center")
+                combo.grid(row=0, column=1, sticky="ew")
+                self.entries[header] = combo
 
             elif header == "Estación":
                 station_var = tk.StringVar()
                 combo = ttk.Combobox(cell, textvariable=station_var, width=30, state="readonly")
-                combo["values"] = ["EOL", "R1", "R2"]
+                combo["values"] = list(self.stations.keys())
                 combo.grid(row=0, column=1, sticky="ew")
-                combo.set("EOL")
+                combo.set(list(self.stations.keys())[0])
                 combo.bind("<<ComboboxSelected>>", self.on_station_selected)
                 self.entries[header] = combo
 
@@ -347,17 +389,31 @@ class FormWindow:
 
     def on_hour_selected(self, event=None):
         if "Turno" in self.entries:
-            now = datetime.now()
-            hour_value = now.strftime("%H:%M")
-            self.entries["Turno"].set(self.get_turno_for_hour(hour_value))
+            selected_hour = self.entries["Hora"].get()
+            if selected_hour:
+                hour_value = selected_hour.split(" - ")[0]
+                self.entries["Turno"].set(self.get_turno_for_hour(hour_value))
 
     def update_device_from_station(self):
         station = self.entries["Estación"].get()
-        device = self.stations.get(station, "")
-        self.entries["Device"].config(state="normal")
-        self.entries["Device"].delete(0, tk.END)
-        self.entries["Device"].insert(0, device)
-        self.entries["Device"].config(state="readonly")
+        if station not in self.stations:
+            station = list(self.stations.keys())[0]
+
+        raw_values = self.stations.get(station, [])
+        if isinstance(raw_values, str):
+            options = [raw_values]
+        elif raw_values:
+            options = list(raw_values)
+        else:
+            options = [""]
+
+        device_widget = self.entries["Device"]
+        device_widget["values"] = options
+
+        if options and options[0] != "":
+            device_widget.set(options[0])
+        else:
+            device_widget.set("")
 
     def on_problem_change(self, event=None):
         problem_widget = self.entries.get("Problema")
@@ -399,13 +455,19 @@ class FormWindow:
             messagebox.showerror("Error al guardar", str(e))
 
     def clear_form(self):
+        default_station = list(self.stations.keys())[0]
+
         for header, widget in self.entries.items():
             if header == "Estación":
-                widget.set("EOL")
+                widget.set(default_station)
             elif header == "Device":
-                widget.config(state="normal")
-                widget.delete(0, tk.END)
-                widget.config(state="readonly")
+                options = self.stations.get(default_station, [])
+                if isinstance(options, str):
+                    options = [options]
+                if not options:
+                    options = [""]
+                widget["values"] = options
+                widget.set(options[0])
             elif header == "Fecha":
                 widget.delete(0, tk.END)
                 widget.insert(0, datetime.now().strftime("%m-%d"))
